@@ -1,116 +1,119 @@
 # seed.py
 
-from app import app
-from random import randint, choice as rc, sample # Import the random module
-from models import db, Restaurant, Pizza, RestaurantPizza, app
+from random import  choice as rc, sample
 from faker import Faker
+from app import app
+from models import db, Restaurant, RestaurantPizza, Pizza
+import random
 
-# List of random restaurant names
-restaurant_names = [
-    "Spice Delight Cafe",
-    "The Hungry Palate Bistro",
-    "Fusion Flavors Grill",
-    "Cozy Corner Eats",
-    "Taste of Tuscany Trattoria",
-    "The Urban Garden Cafe",
-    "Savory Spice Kitchen",
-    "Seafood Sensations Shack",
-    "The Rustic Rooster Diner",
-    "Flavor Fusion Bistro",
-    "Street Food Safari",
-    "Sushi Samurai House",
-    "The Gourmet Galley",
-    "Fireside Grill & Tavern",
-    "Mediterranean Breeze Bistro",
+#defined a list of the restaurant names
+restaurantnames = [    
+    "The Savory Spoon",
+    "Fireside Bistro",
+    "The Hungry Hound",
+    "Spice and Vine",
+    "Fork & Knife",
+    "Tastes of Tuscany",
     "The Wholesome Plate",
-    "Harborview Oyster Bar",
-    "Crisp & Crave Creperie",
-    "The Spicy Noodle Hut",
-    "Farm-to-Table Feastery",
-    "El Paso Enchilada Express",
-    "Sweet Serenity Bakery",
-    "The Bamboo Garden",
-    "Urban Elegance Eatery",
-    "Taste of India Palace",
-    "Pizza Perfection Parlor",
-    "Spice Route Kitchen",
-    "The Blue Bayou Bistro",
+    "Munchies & More",
+    "Coastal Catch",
+    "The Gourmet Garden",
+    "Sizzle & Smoke",
+    "Flavor Fusion",
+    "The Rustic Retreat",
+    "Zesty Delights",
+    "The Urban Grill",
     "Crispy Crust Pizzeria",
-    "Zen Garden Sushi Lounge"
+    "The Sizzling Skillet",
+    "The Secret Ingredient",
+    "Sweet Tooth Treats",
+    "Fusion Feast",
+    "The Spice Route",
+    "Farmhouse Fare",
+    "Delish Delights",
+    "The Olive Branch",
+    "Tacos & Tequila",
+    "The Daily Grind",
+    "The Green Leaf Cafe",
+    "Sugar & Spice Bakery",
+    "Bite Me Burgers",
+    "The Cozy Corner",
 ]
-
-# List of random restaurant ingredients
-restaurant_ingredients = [
-    "Fresh Basil Leaves",
-    "Aged Balsamic Vinegar",
-    "Roasted Red Peppers",
-    "Gourmet Truffle Oil",
-    "Goat Cheese Crumbles",
-    "Wild Mushroom Blend",
-    "Sun-Dried Tomatoes",
-    "Crispy Bacon Bits",
-    "Caramelized Onions",
-    "Pineapple Chunks",
-    "Szechuan Peppercorns",
-    "Blackened Cajun Spice",
-    "Mango Salsa",
-    "Jalapeño Pepper Rings",
-    "Dijon Mustard",
-    "Blue Cheese Dressing",
-    "Sweet Chili Sauce",
-    "Toasted Almond Slivers",
-    "Pickled Ginger",
-    "Sriracha Mayo",
-    "Pesto Sauce",
-    "Candied Walnuts",
-    "Artichoke Hearts",
-    "Honey Glazed Ham",
-    "Smoked Paprika",
-    "Lemon Zest",
-    "Horseradish Cream",
-    "Kimchi",
+#defined a list of ingredients
+ingredients = [
+    "Pepperoni",
+    "Mushrooms",
+    "Bell peppers",
+    "Onions",
+    "Black olives",
+    "Sausage",
+    "Fresh basil",
+    "Pineapple",
+    "Ham",
+    "Spinach",
+    "Feta cheese",
+    "Sun-dried tomatoes",
+    "Anchovies",
+    "Arugula",
+    "Provolone cheese",
+    "Artichoke hearts",
+    "Goat cheese",
+    "Garlic",
+    "Jalapeños",
+    "Ricotta cheese",
+    "Red pepper flakes",
+    "Fresh tomatoes",
+    "Bacon",
+    "Mozzarella cheese",
+    "Fresh oregano",
     "Capers",
-    "Garam Masala"
+    "Chicken",
+    "Parmesan cheese",
+    "Gorgonzola cheese",
+    "Fresh cilantro",
 ]
 
 fake = Faker()
-
+# a context manager to ensure database operations occur within the application context
 with app.app_context():
-        # Create some restaurants with random names
-        db.session.query(Restaurant).delete()
-        db.session.query(RestaurantPizza).delete()
-        db.session.query(Pizza).delete()
-    
-        restaurants = []
-        for i in range(100):
-           r = Restaurant(
-                name = rc(restaurant_names),
-                address = fake.address()
-            )
-           restaurants.append(r)
-    
-        db.session.add_all(restaurants)
-        db.session.commit()
-    
-        pizzas = []
-        for i in range(100):
-            p = Pizza(
-                name = rc(restaurant_ingredients),
-                    ingredients = ','.join(sample(restaurant_ingredients,3)),            
-            )
+    #delete existing data from tables
+    db.session.query(RestaurantPizza).delete()
+    db.session.query(Restaurant).delete()
+    db.session.query(Pizza).delete()
+    #initialize an empty list
+    restaurants = []
+    for i in range(100):
+        r = Restaurant(
+            name = fake.company(),
+            address = fake.address()
+        )
+        restaurants.append(r)
+        
+    db.session.add_all(restaurants)
+    db.session.commit()
+    #initialize an empty list
+    pizzas = []
+    for i in range(100):
+        p = Pizza(
+            #get a random ingredient from the ingredient list to be used as the name of the pizza
+            name =rc(ingredients),
+            #create a random list of 3 ingredients joined to a single string
+            ingredients =','.join(sample(ingredients,3)),            
+        )
         pizzas.append(p)
         
-        db.session.add_all(pizzas)
-        db.session.commit()
+    db.session.add_all(pizzas)
+    db.session.commit()
     
+    restaurant_pizzas = []
+    for i in range(10) : 
+        rp =  RestaurantPizza(
+            name=fake.unique.company(), #generate a unique company name using faker 
+            price=random.randint(1, 30),#generate a random price   
+            pizza_id=rc(pizzas).id, #select a random pizza object from the pizza list 
+            restaurant_id=rc(restaurants).id)   #select a random restaurant object from the restaurants list 
+        restaurant_pizzas.append(rp)
+     
+    db.session.add_all(restaurant_pizzas)
+    db.session.commit()
     
-        restaurant_pizza = []
-        for i in range(100):
-            rp = RestaurantPizza(
-                price=randint(1,30),          
-            )
-            restaurant_pizza.append(rp)
-        
-        db.session.add_all(restaurant_pizza)
-        db.session.commit()
-        

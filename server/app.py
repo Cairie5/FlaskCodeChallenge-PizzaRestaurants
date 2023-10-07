@@ -1,123 +1,141 @@
 #app.py
 
-from flask import Flask, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, make_response,jsonify,request
 from flask_migrate import Migrate
-from sqlalchemy.exc import IntegrityError
+from flask_restful import Api,Resource
+from models import db, Restaurant, Pizza, RestaurantPizza
+# from werkzeug.exceptions import NotFound
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pizza_restaurants.db'
-db = SQLAlchemy(app)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'#specifies the URI for the sqlite database
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.json.compact = False
 
-# Initialize Flask-Migrate
 migrate = Migrate(app, db)
 
-# Define your models (Restaurant, Pizza, RestaurantPizza) here
-class Restaurant(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
-    address = db.Column(db.String(200), nullable=False)
-    pizzas = db.relationship('Pizza', secondary='restaurant_pizza', back_populates='restaurants')
+db.init_app(app)
+api= Api(app)#create an instance of the Flask-restful API extension 
+[]
+#define a new class home
+#Resource class is used to define how different http methods shold be handled
+class Home(Resource):
+    def get(self):
+        
+        response_dict ={
+            "message":"Welcome to PIzza Restaurant ",
+        }
+        
+        response = make_response(
+            response_dict,
+            200    
+        )
+        return response
+api.add_resource(Home, '/')
 
-class Pizza(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)
-    ingredients = db.Column(db.String(200), nullable=False)
-    restaurants = db.relationship('Restaurant', secondary='restaurant_pizza', back_populates='pizzas')
+class Restaurants(Resource):
+    def get(self):
+        #initialize an empty list
+        restaurants = []
+        for restaurant  in Restaurant.query.all():
+            #resturant_dict is used to store information about a single restaurant 
+            restaurant_dict={
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "address": restaurant.address
+            }
+            restaurants.append(restaurant_dict)
+        return make_response(jsonify(restaurants), 200)
 
-class RestaurantPizza(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    price = db.Column(db.Float, nullable=False)
-    pizza_id = db.Column(db.Integer, db.ForeignKey('pizza.id'), nullable=False)
-    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
+api.add_resource(Restaurants,'/restaurants')  
+ 
+class RestaurantByID(Resource):
 
-# Define routes and API functionality below
+    def get(self, id):
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        if restaurant:
+            restaurant_dict=restaurant.to_dict()
+            return make_response(jsonify(restaurant_dict), 200)
+        else:
+            return make_response(jsonify({"error": "Restaurant not found"}), 404)
 
-# GET all restaurants
-@app.route('/restaurants', methods=['GET'])
-def get_restaurants():
-    restaurants = Restaurant.query.all()
-    data = [{
-        'id': restaurant.id,
-        'name': restaurant.name,
-        'address': restaurant.address
-    } for restaurant in restaurants]
-    return jsonify(data)
 
-# GET a restaurant by ID
-@app.route('/restaurants/<int:restaurant_id>', methods=['GET'])
-def get_restaurant(restaurant_id):
-    restaurant = Restaurant.query.get(restaurant_id)
-    if not restaurant:
-        return jsonify({'error': 'Restaurant not found'}), 404
+    def delete(self,id):
+        restaurant = Restaurant.query.filter_by(id=id).first()
+        if restaurant:
+            db.session.delete(restaurant)
+            db.session.commit()
+            return make_response(jsonify({"message":"Restaurant succesfully deleted"}), 204)
+        else:
+            return make_response(jsonify({"error": "Restaurant not found"}), 404)
 
-    pizzas = [{
-        'id': pizza.id,
-        'name': pizza.name,
-        'ingredients': pizza.ingredients
-    } for pizza in restaurant.pizzas]
 
-    data = {
-        'id': restaurant.id,
-        'name': restaurant.name,
-        'address': restaurant.address,
-        'pizzas': pizzas
-    }
-    return jsonify(data)
 
-# DELETE a restaurant by ID
-@app.route('/restaurants/<int:restaurant_id>', methods=['DELETE'])
-def delete_restaurant(restaurant_id):
-    restaurant = Restaurant.query.get(restaurant_id)
-    if not restaurant:
-        return jsonify({'error': 'Restaurant not found'}), 404
+api.add_resource(RestaurantByID, '/restaurants/<int:id>')
 
-    # Delete associated RestaurantPizzas
-    RestaurantPizza.query.filter_by(restaurant_id=restaurant_id).delete()
-    db.session.delete(restaurant)
-    db.session.commit()
+class Pizzas(Resource):
 
-    return '', 204
+    def get(self):
+        pizzas = []
+        for pizza in Pizza.query.all():
+            pizza_dict={
+                "id": pizza.id,
+                "name": pizza.name,
+                "ingredients": pizza.ingredients
+            }
+            pizzas.append(pizza_dict)
+        return make_response(jsonify(pizzas), 200)
+api.add_resource(Pizzas, '/pizzas')
 
-# GET all pizzas
-@app.route('/pizzas', methods=['GET'])
-def get_pizzas():
-    pizzas = Pizza.query.all()
-    data = [{
-        'id': pizza.id,
-        'name': pizza.name,
-        'ingredients': pizza.ingredients
-    } for pizza in pizzas]
-    return jsonify(data)
+class RestaurantPizzas(Resource):
+    def post(self):
+        data = request.get_json()#retrieve json data from the http request body
 
-# POST a new RestaurantPizza
-@app.route('/restaurant_pizzas', methods=['POST'])
-def create_restaurant_pizza():
-    data = request.json
-    price = data.get('price')
-    pizza_id = data.get('pizza_id')
-    restaurant_id = data.get('restaurant_id')
+        # Validate that the required fields are present in the request
+        if not all(key in data for key in ("price", "pizza_id", "restaurant_id")):
+            return make_response(jsonify({"errors": ["validation errors.include all keys"]}), 400)
 
-    # Validate data
-    if not (price and pizza_id and restaurant_id):
-        return jsonify({'errors': ['Validation errors']}), 400
+        price = data["price"]
+        pizza_id = data["pizza_id"]
+        restaurant_id = data["restaurant_id"]
 
-    restaurant_pizza = RestaurantPizza(price=price, pizza_id=pizza_id, restaurant_id=restaurant_id)
-    db.session.add(restaurant_pizza)
-    
-    try:
-        db.session.commit()
+        # Check if the Pizza and Restaurant exist in the database based on their respective ids
         pizza = Pizza.query.get(pizza_id)
-        return jsonify({
-            'id': pizza.id,
-            'name': pizza.name,
-            'ingredients': pizza.ingredients
-        }), 201
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({'errors': ['Validation errors']}), 400
+        restaurant = Restaurant.query.get(restaurant_id)
 
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True, port=5555)
+
+        if not pizza or not restaurant:
+            return make_response(jsonify({"errors": ["validation errors pizza and restaurant dont exist"]}), 400)
+
+        # Create a new RestaurantPizza
+        restaurant_pizza = RestaurantPizza(
+            price = data["price"],
+            pizza_id = data["pizza_id"],
+            restaurant_id = data["restaurant_id"]
+
+        )
+
+        db.session.add(restaurant_pizza)
+        db.session.commit()
+
+        # Return data related to the Pizza
+        pizza_data = {
+            "id": pizza.id,
+            "name": pizza.name,
+            "ingredients": pizza.ingredients
+        }
+
+        return make_response(jsonify(pizza_data), 201)
+api.add_resource(RestaurantPizzas,'/restaurant_pizzas')   
+ 
+# @app.errorhandler(NotFound)
+# def handle_not_found(e):
+#     response = make_response(
+#         "Not Found: The requested resource does not exist.",
+#         404
+#     )
+#     return response
+
+
+if __name__ == '_main_':
+    app.run(port=5555, debug=True)
+    
